@@ -42,4 +42,5 @@ def normalize(raw: RawTxn, msg_id: str, source_type: str,
         source_msg_id=msg_id,
         raw_ref=raw_ref,
         imported_at=imported_at,
+        seq=str(seq),
     )

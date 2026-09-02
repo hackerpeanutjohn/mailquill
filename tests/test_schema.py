@@ -2,11 +2,12 @@ from mailquill.schema import FIELDS, Transaction, make_txn_id
 
 
 def test_fields_order_is_fixed():
+    """欄位順序即 CSV 欄位順序，只能往後追加，不能插入或重排。"""
     assert FIELDS == [
         "txn_id", "date", "post_date", "amount", "currency",
         "merchant_raw", "merchant_norm", "category_l1", "category_l2",
         "bank", "account_last4", "source_type", "source_msg_id",
-        "raw_ref", "imported_at",
+        "raw_ref", "imported_at", "seq",
     ]
 
 

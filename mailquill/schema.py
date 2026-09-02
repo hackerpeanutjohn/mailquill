@@ -8,7 +8,7 @@ FIELDS = [
     "txn_id", "date", "post_date", "amount", "currency",
     "merchant_raw", "merchant_norm", "category_l1", "category_l2",
     "bank", "account_last4", "source_type", "source_msg_id",
-    "raw_ref", "imported_at",
+    "raw_ref", "imported_at", "seq",
 ]
 
 
@@ -42,10 +42,17 @@ class Transaction:
     source_msg_id: str
     raw_ref: str
     imported_at: str
+    seq: str = ""
+    """該筆在來源帳單中的出現序號（字串）。txn_id 的一部分，必須持久化：
+
+    沒存下來的話，日後只要 make_txn_id 公式改動，就無法從 CSV 重算 id，
+    同一筆交易會拿到兩種 id 而重複入帳。空字串代表遷移前的舊資料。
+    """
 
     def to_row(self) -> dict[str, str]:
         return {f.name: getattr(self, f.name) for f in fields(self)}
 
     @classmethod
     def from_row(cls, row: dict[str, str]) -> "Transaction":
-        return cls(**{name: row[name] for name in FIELDS})
+        # seq 是後加欄位，讀得進遷移前沒有這欄的舊 CSV
+        return cls(**{name: row.get(name, "") for name in FIELDS})
