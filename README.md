@@ -161,6 +161,23 @@ mv token.json token.json.bak                                   # 留個備份，
 
 常見原因：refresh token 閒置超過 6 個月、Google Cloud 專案還在「測試中」（testing）狀態的 token 7 天到期、帳號改密碼、或在 Google 帳號設定裡移除了這個 App 的存取權。
 
+### 🧬 `migrate-ids`：修舊式 txn_id 造成的重複列
+
+`txn_id` 的雜湊公式後來把 `seq`（同一份帳單內的出現序號）納進去，讓「同日、同店、同額」的兩筆真實交易不會被誤判成同一筆。但公式改動前寫進 CSV 的列沒有一併重算，於是同一封信被重抓時，同一筆交易會拿到兩種 id，去重（只比對 `txn_id`）就攔不住，報表上出現兩筆一模一樣的紀錄。
+
+```bash
+.venv/bin/python -m mailquill.cli migrate-ids            # dry-run：只列出會怎麼改，不寫檔
+.venv/bin/python -m mailquill.cli migrate-ids --apply    # 實際遷移（自動備份 + 重建 SQLite）
+```
+
+`--apply` 會先把原 CSV 複製成 `transactions.csv.bak-<時間戳>` 再原子寫回，並同步重建 SQLite。已遷移過的 CSV 再跑是 no-op，不會動檔。
+
+`seq` 由「該列在其 `(source_msg_id, imported_at)` 群組內的位置」還原 —— 同一封信的交易是照解析順序寫進 CSV，同一份帳單重跑的解析順序一致，所以位置就是當初的 `seq`。`無法歸類的列` 應該是 0；不是 0 的話那些列會原封不動保留並列出來，不會被猜測性地改掉。
+
+`seq` 現在是 CSV 的一個欄位，日後公式再變才有辦法重算。`run` 開跑前會檢查 CSV 裡還有沒有舊式 id（`seq` 為空），有就先警告你跑 `migrate-ids`，免得抓完才發現又多了重複列。
+
+---
+
 ### 📁 路徑一律以 `config.yaml` 為準
 
 `rebuild`、`report`、`run`、`ingest` 都讀同一份 `config.yaml`（預設 `./config.yaml`，可用 `--config` 指定），所以 `csv_path` / `db_path` / `categories_path` 改一個地方就好，不會出現「rebuild 成功但報表沒更新」。

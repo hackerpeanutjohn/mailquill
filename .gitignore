@@ -13,6 +13,7 @@ rules.yaml
 data/
 raw/
 transactions.csv
+transactions.csv.bak-*
 report.html
 *.log
 
