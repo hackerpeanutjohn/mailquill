@@ -3,6 +3,8 @@ import os
 import sqlite3
 import textwrap
 
+import yaml
+
 import pytest
 
 from mailquill.schema import Transaction
@@ -113,3 +115,65 @@ def test_rebuild_atomic_rewrite_failure_leaves_csv_intact(tmp_path, monkeypatch)
 
     assert open(csv_path, "rb").read() == original_bytes, "CSV mutated despite mid-write failure"
     assert _no_tmp_files() == [], "Leftover .tmp after mid-write failure"
+
+
+def _config_file(tmp_path, **overrides):
+    """寫一份最小 config.yaml，回傳路徑。"""
+    data = {"label": "銀行"}
+    data.update(overrides)
+    p = tmp_path / "config.yaml"
+    p.write_text(yaml.safe_dump(data, allow_unicode=True), encoding="utf-8")
+    return str(p)
+
+
+def test_rebuild_defaults_come_from_config(tmp_path):
+    """不帶 --csv/--db/--categories 時，rebuild 應改讀 config.yaml 的路徑。
+
+    Regression guard：舊版 rebuild 只用 argparse 硬編預設值（mailquill.db），
+    與 report 讀的 config.db_path 不一致，會出現「rebuild 成功但報表沒更新」。
+    """
+    csv_path = str(tmp_path / "from_config.csv")
+    db_path = str(tmp_path / "from_config.db")
+    append_transactions(csv_path, [_txn("全聯福利中心")])
+    cfg = _config_file(
+        tmp_path, csv_path=csv_path, db_path=db_path,
+        categories_path=_rules_file(tmp_path),
+    )
+
+    rc = main(["rebuild", "--config", cfg])
+    assert rc == 0
+    assert read_transactions(csv_path)[0].category_l1 == "食"
+    assert os.path.exists(db_path), "rebuild 沒寫到 config.yaml 指定的 db_path"
+
+
+def test_rebuild_explicit_flags_override_config(tmp_path):
+    """顯式給的 CLI 參數優先於 config.yaml。"""
+    cli_csv = str(tmp_path / "cli.csv")
+    cli_db = str(tmp_path / "cli.db")
+    append_transactions(cli_csv, [_txn("全聯福利中心")])
+    cfg = _config_file(
+        tmp_path,
+        csv_path=str(tmp_path / "ignored.csv"),
+        db_path=str(tmp_path / "ignored.db"),
+        categories_path=_rules_file(tmp_path),
+    )
+
+    rc = main(["rebuild", "--config", cfg, "--csv", cli_csv, "--db", cli_db])
+    assert rc == 0
+    assert os.path.exists(cli_db)
+    assert not os.path.exists(str(tmp_path / "ignored.db"))
+    assert read_transactions(cli_csv)[0].category_l1 == "食"
+
+
+def test_rebuild_without_config_file_falls_back_to_defaults(tmp_path, monkeypatch):
+    """config.yaml 不存在時不應炸掉，退回硬編預設值（相對於 cwd）。"""
+    monkeypatch.chdir(tmp_path)
+    append_transactions("transactions.csv", [_txn("全聯福利中心")])
+    (tmp_path / "categories.yaml").write_text(
+        'rules:\n  - {keyword: "全聯", l1: "食", l2: "生活採買"}\n', encoding="utf-8"
+    )
+
+    rc = main(["rebuild"])
+    assert rc == 0
+    assert os.path.exists("mailquill.db")
+    assert read_transactions("transactions.csv")[0].category_l1 == "食"

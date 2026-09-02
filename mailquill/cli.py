@@ -12,7 +12,7 @@ from datetime import datetime
 from mailquill.categorizer import apply_categories, load_categories
 from mailquill.schema import FIELDS
 from mailquill.store import read_transactions, rebuild_sqlite
-from mailquill.config import load_config
+from mailquill.config import Config, load_config
 from mailquill.bootstrap import bootstrap_rules
 from mailquill.gmail_client import build_service, list_all_labels, gmail_after_query
 from mailquill.rules import save_rules
@@ -78,6 +78,17 @@ def _resolve_since(args) -> str | None:
     return since
 
 
+def _config_or_defaults(path: str) -> Config:
+    """讀 config.yaml 當作路徑預設值；檔案不存在或缺 label 時退回 Config 預設。
+
+    rebuild 完全離線（只碰 CSV/SQLite），沒有 config.yaml 也該能跑。
+    """
+    try:
+        return load_config(path)
+    except (FileNotFoundError, ValueError):
+        return Config(label=[])
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="mailquill")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -85,9 +96,13 @@ def main(argv: list[str] | None = None) -> int:
     p_rebuild = sub.add_parser(
         "rebuild", help="重新套用分類並由 CSV 重建 SQLite"
     )
-    p_rebuild.add_argument("--csv", default="transactions.csv")
-    p_rebuild.add_argument("--db", default="mailquill.db")
-    p_rebuild.add_argument("--categories", default="categories.yaml")
+    p_rebuild.add_argument("--config", default="config.yaml")
+    p_rebuild.add_argument("--csv", default=None,
+                           help="預設取 config.yaml 的 csv_path")
+    p_rebuild.add_argument("--db", default=None,
+                           help="預設取 config.yaml 的 db_path")
+    p_rebuild.add_argument("--categories", default=None,
+                           help="預設取 config.yaml 的 categories_path")
 
     p_labels = sub.add_parser(
         "labels", help="列出 Gmail 內所有 Label 的確切名稱（除錯／設定用）"
@@ -122,9 +137,14 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     if args.command == "rebuild":
-        print("rebuild: 重新分類並重建 SQLite 中…")
-        n = rebuild(args.csv, args.db, args.categories)
-        print(f"rebuilt {n} transactions -> {args.db}")
+        cfg = _config_or_defaults(args.config)
+        csv_path = args.csv or cfg.csv_path
+        db_path = args.db or cfg.db_path
+        categories_path = args.categories or cfg.categories_path
+        print(f"rebuild: 重新分類並重建 SQLite 中…"
+              f"（csv={csv_path} db={db_path} categories={categories_path}）")
+        n = rebuild(csv_path, db_path, categories_path)
+        print(f"rebuilt {n} transactions -> {db_path}")
         return 0
     if args.command == "labels":
         cfg = load_config(args.config)
