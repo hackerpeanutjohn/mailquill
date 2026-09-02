@@ -1,6 +1,7 @@
 # secrets / local config — never commit
 credentials.json
 token.json
+token.json.bak
 passwords.txt
 *.secret.yaml
 config.yaml
