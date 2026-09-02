@@ -5,19 +5,21 @@ import argparse
 import csv
 import os
 import re
+import shutil
 import sys
 import tempfile
 from datetime import datetime
 
 from mailquill.categorizer import apply_categories, load_categories
 from mailquill.schema import FIELDS
-from mailquill.store import read_transactions, rebuild_sqlite
+from mailquill.store import count_legacy_id_rows, read_transactions, rebuild_sqlite
 from mailquill.config import Config, load_config
 from mailquill.bootstrap import bootstrap_rules
 from mailquill.gmail_client import build_service, list_all_labels, gmail_after_query
 from mailquill.rules import save_rules
 from mailquill.pipeline import run_pipeline
 from mailquill.ingest import ingest_paths
+from mailquill.migrate import plan_migration
 from mailquill.report import generate_report
 
 
@@ -89,6 +91,49 @@ def _config_or_defaults(path: str) -> Config:
         return Config(label=[])
 
 
+def _warn_legacy_ids(csv_path: str) -> int:
+    """CSV 裡還有舊式 id 就警告：重抓同一封信會產生重複列。"""
+    n = count_legacy_id_rows(csv_path)
+    if n:
+        print(f"⚠ CSV 有 {n} 列是舊式 txn_id（無 seq）。重抓到同一封信會產生"
+              f"重複列，建議先執行：mailquill migrate-ids --apply")
+    return n
+
+
+def _migrate_ids(cfg_path: str, apply: bool) -> int:
+    """重算舊式 txn_id、補上 seq、移除因此撞成同 id 的重複列。"""
+    cfg = load_config(cfg_path)
+    txns = read_transactions(cfg.csv_path)
+    plan = plan_migration(txns)
+
+    mode = "apply" if apply else "dry-run"
+    print(f"migrate-ids ({mode}): csv={cfg.csv_path}")
+    print(f"  總列數                     : {len(txns)}")
+    print(f"  id 重算的列                : {plan.changed}")
+    print(f"  無法歸類的列（應為 0）      : {len(plan.unexplained)}")
+    print(f"  重複而移除的列              : {len(plan.removed)}")
+    print(f"  遷移後總列數                : {len(plan.txns)}")
+    for t in plan.removed:
+        print(f"    - {t.date} {t.amount:>9} {t.bank:<8} {t.merchant_raw} "
+              f"（{t.txn_id} imported_at={t.imported_at}）")
+    for t in plan.unexplained:
+        print(f"    ? 無法歸類：{t.date} {t.merchant_raw} {t.txn_id}")
+
+    if not apply:
+        print("  未寫檔。確認以上內容後加 --apply 才會實際遷移。")
+        return 0
+    if plan.changed == 0 and not plan.removed:
+        print("  無需遷移，未寫檔。")
+        return 0
+
+    backup = f"{cfg.csv_path}.bak-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    shutil.copy2(cfg.csv_path, backup)
+    _write_csv_atomic(cfg.csv_path, plan.txns)
+    n = rebuild_sqlite(cfg.csv_path, cfg.db_path)
+    print(f"  已遷移：備份 -> {backup}；重建 SQLite {n} 列 -> {cfg.db_path}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="mailquill")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -128,6 +173,13 @@ def main(argv: list[str] | None = None) -> int:
     p_ingest.add_argument("--config", default="config.yaml")
     p_ingest.add_argument("--bank", default=None,
                           help="指定銀行 parser（如 fubon）；不給則依內容自動判斷")
+
+    p_migrate = sub.add_parser(
+        "migrate-ids", help="把舊式 txn_id 重算成現行公式並移除因此重複的列"
+    )
+    p_migrate.add_argument("--config", default="config.yaml")
+    p_migrate.add_argument("--apply", action="store_true",
+                           help="真的寫回 CSV（預設只做 dry-run 並列出變更）")
 
     p_report = sub.add_parser(
         "report", help="由 SQLite 產生自包含 HTML 報表"
@@ -171,6 +223,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "run":
         cfg = load_config(args.config)
+        _warn_legacy_ids(cfg.csv_path)
         service = build_service(cfg.credentials_path, cfg.token_path)
         imported_at = datetime.now().isoformat(timespec="seconds")
         since = _resolve_since(args)
@@ -218,6 +271,8 @@ def main(argv: list[str] | None = None) -> int:
             for item in r.parse_warnings:
                 print(f"  - {item}")
         return 0
+    if args.command == "migrate-ids":
+        return _migrate_ids(cfg_path=args.config, apply=args.apply)
     if args.command == "report":
         cfg = load_config(args.config)
         print("report: 由 SQLite 產生 HTML 報表中…")

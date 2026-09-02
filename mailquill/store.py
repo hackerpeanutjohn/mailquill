@@ -23,6 +23,15 @@ def read_transactions(csv_path: str) -> list[Transaction]:
         return [Transaction.from_row(row) for row in reader]
 
 
+def count_legacy_id_rows(csv_path: str) -> int:
+    """回傳 seq 為空的列數，也就是 txn_id 還是舊公式（無 seq）算出來的列。
+
+    這些列的 id 無法對上現行公式，同一封信一被重抓就會多長一列，
+    所以在抓信前要先提醒跑 migrate-ids。
+    """
+    return sum(1 for t in read_transactions(csv_path) if t.seq == "")
+
+
 def append_transactions(csv_path: str, txns: list[Transaction]) -> AppendResult:
     existing_ids = {t.txn_id for t in read_transactions(csv_path)}
     file_exists = os.path.exists(csv_path)
