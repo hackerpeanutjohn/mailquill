@@ -12,8 +12,9 @@
 git clone <your-fork-or-repo-url> mailquill
 cd mailquill
 python3 -m venv .venv
-.venv/bin/python -m pip install -e .          # 安裝套件與相依
-.venv/bin/python -m pip install -e ".[dev]"   # 想跑測試再裝這個
+source .venv/bin/activate          # 之後所有指令都在這個 venv 裡跑
+pip install -e .                   # 安裝套件與相依
+pip install -e ".[dev]"            # 想跑測試再裝這個
 ```
 
 安裝後會有 `mailquill` 指令(等同 `python -m mailquill.cli`)。

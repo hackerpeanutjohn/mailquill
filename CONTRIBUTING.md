@@ -85,7 +85,7 @@ class YourBankParser(Parser):
 跑測試:
 
 ```bash
-.venv/bin/python -m pytest tests/test_parsers_yourbank.py
+pytest tests/test_parsers_yourbank.py
 ```
 
 ---
@@ -118,7 +118,7 @@ git grep -nIE '真實商家關鍵字|真實卡號' -- tests mailquill   # 換成
 ## 送 PR
 
 1. 開一支分支,一支 parser 一個 PR 最好審。
-2. 確認 `.venv/bin/python -m pytest` 全綠。
+2. 確認 `pytest` 全綠。
 3. PR 描述附上:哪家銀行、帳單來源(Gmail 附件/內文/需手動下載)、以及你已用**合成資料**測試。
 
 謝謝你讓 Mailquill 支援更多銀行 🙏

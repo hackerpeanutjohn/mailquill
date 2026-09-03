@@ -51,8 +51,9 @@
 
 ```bash
 python3 -m venv .venv
-.venv/bin/python -m pip install -e .          # 安裝
-.venv/bin/python -m pip install -e ".[dev]"   # 含測試相依(選用)
+source .venv/bin/activate          # 之後所有指令都在這個 venv 裡跑
+pip install -e .                   # 安裝
+pip install -e ".[dev]"            # 含測試相依(選用)
 
 # 1) 設定 Google OAuth、config.yaml、passwords.txt（見 docs/SETUP.md）
 # 2) 從既有 Gmail Label 產生抓取規則草稿，檢查後即可
@@ -107,19 +108,19 @@ Mailquill 的核心是 **CSV 是唯一真實來源（single source of truth）**
 
 ```bash
 # 1) 抓新信（只有這步碰 Gmail）。--since 帶「上次抓到哪」的前一兩天即可
-.venv/bin/python -m mailquill.cli run --since 2026-06-01
+mailquill run --since 2026-06-01
 
 # 2) 重新分類 + 重建 SQLite（路徑取自 config.yaml，不用自己帶 --db）
-.venv/bin/python -m mailquill.cli rebuild
+mailquill rebuild
 
 # 3) 出離線儀表板
-.venv/bin/python -m mailquill.cli report      # → report.html
+mailquill report      # → report.html
 ```
 
 跑完先自我驗證：
 
 ```bash
-.venv/bin/python -m pytest -q                                  # 全測試（<1 秒）
+pytest -q                                  # 全測試（<1 秒）
 tail -1 transactions.csv | cut -d, -f2                          # CSV 最新一筆交易日
 ```
 
@@ -150,13 +151,13 @@ google.auth.exceptions.RefreshError: ('invalid_grant: Bad Request', ...)
 
 ```bash
 mv token.json token.json.bak                                   # 留個備份，成功後可刪
-.venv/bin/python -m mailquill.cli run --since 2026-06-01        # 自動開瀏覽器授權
+mailquill run --since 2026-06-01        # 自動開瀏覽器授權
 ```
 
 授權成功會自動寫回新的 `token.json`，然後接著跑完抓信流程。若想先只驗證授權有沒有通、不跑整條 pipeline：
 
 ```bash
-.venv/bin/python -m mailquill.cli labels        # 只列 Gmail Label，最輕量的連線測試
+mailquill labels        # 只列 Gmail Label，最輕量的連線測試
 ```
 
 常見原因：refresh token 閒置超過 6 個月、Google Cloud 專案還在「測試中」（testing）狀態的 token 7 天到期、帳號改密碼、或在 Google 帳號設定裡移除了這個 App 的存取權。
@@ -166,8 +167,8 @@ mv token.json token.json.bak                                   # 留個備份，
 `txn_id` 的雜湊公式後來把 `seq`（同一份帳單內的出現序號）納進去，讓「同日、同店、同額」的兩筆真實交易不會被誤判成同一筆。但公式改動前寫進 CSV 的列沒有一併重算，於是同一封信被重抓時，同一筆交易會拿到兩種 id，去重（只比對 `txn_id`）就攔不住，報表上出現兩筆一模一樣的紀錄。
 
 ```bash
-.venv/bin/python -m mailquill.cli migrate-ids            # dry-run：只列出會怎麼改，不寫檔
-.venv/bin/python -m mailquill.cli migrate-ids --apply    # 實際遷移（自動備份 + 重建 SQLite）
+mailquill migrate-ids            # dry-run：只列出會怎麼改，不寫檔
+mailquill migrate-ids --apply    # 實際遷移（自動備份 + 重建 SQLite）
 ```
 
 `--apply` 會先把原 CSV 複製成 `transactions.csv.bak-<時間戳>` 再原子寫回，並同步重建 SQLite。已遷移過的 CSV 再跑是 no-op，不會動檔。
@@ -183,14 +184,14 @@ mv token.json token.json.bak                                   # 留個備份，
 `rebuild`、`report`、`run`、`ingest` 都讀同一份 `config.yaml`（預設 `./config.yaml`，可用 `--config` 指定），所以 `csv_path` / `db_path` / `categories_path` 改一個地方就好，不會出現「rebuild 成功但報表沒更新」。
 
 ```bash
-.venv/bin/python -m mailquill.cli rebuild
+mailquill rebuild
 # rebuild: 重新分類並重建 SQLite 中…（csv=transactions.csv db=mailagent.db categories=categories.yaml）
 ```
 
 指令會把實際採用的路徑印出來，對不上時一眼看得到。想臨時蓋掉某個路徑（例如產一份測試用 DB）再帶旗標，旗標優先於 `config.yaml`：
 
 ```bash
-.venv/bin/python -m mailquill.cli rebuild --db /tmp/scratch.db
+mailquill rebuild --db /tmp/scratch.db
 ```
 
 沒有 `config.yaml` 時（例如剛 clone、CI）`rebuild` 仍可跑，退回內建預設 `transactions.csv` / `mailquill.db` / `categories.yaml`。
@@ -259,7 +260,7 @@ mailquill ingest --bank fubon ~/Downloads/fubon/  # 整個資料夾
 ## 🧪 開發
 
 ```bash
-.venv/bin/python -m pytest      # 全部測試
+pytest      # 全部測試
 ```
 
 專案結構：`mailquill/`（核心）、`mailquill/parsers/`（各家 parser）、`tests/`、`docs/`。
