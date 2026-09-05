@@ -33,6 +33,7 @@ class TaishinParser(Parser):
         txns: list[RawTxn] = []
         last4 = ""
         for block in blocks:
+            previous = ""
             for line in block.splitlines():
                 s = line.strip()
                 m = _TXN.match(s)
@@ -40,14 +41,20 @@ class TaishinParser(Parser):
                     card = _CARD.search(s)
                     if card:
                         last4 = card.group(1)
+                    if s:
+                        previous = s
                     continue
                 ty, tm, td, py, pm, pd, rest = m.groups()
                 tokens = rest.split()
                 # 描述之後第一個純數字 token = 新臺幣金額
                 idx = next((i for i, t in enumerate(tokens) if _NUM.fullmatch(t)), None)
-                if idx is None or idx == 0:
+                if idx is None:
                     continue
+                # 新版 PDF 的文字層會把消費明細換到日期列前一行，日期列只剩
+                # 日期、金額與幣別。僅在已讀到卡號且前一行不是另一筆日期時採用。
                 merchant = " ".join(tokens[:idx]).strip()
+                if idx == 0 and last4 and previous and not _TXN.match(previous):
+                    merchant = previous
                 if not merchant:
                     continue
                 txns.append(RawTxn(
@@ -59,4 +66,5 @@ class TaishinParser(Parser):
                     account_last4=last4,
                     currency="TWD",
                 ))
+                previous = s
         return txns
