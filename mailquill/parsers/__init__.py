@@ -31,6 +31,7 @@ from mailquill.parsers.fubon import FubonParser  # noqa: E402
 from mailquill.parsers.esun import EsunParser  # noqa: E402
 from mailquill.parsers.sinopac import SinoPacParser  # noqa: E402
 from mailquill.parsers.amex import AmexParser  # noqa: E402
+from mailquill.parsers.hsbc import HsbcParser  # noqa: E402
 
 register(CathayParser())
 register(UnionBankParser())
@@ -39,4 +40,5 @@ register(FubonParser())
 register(EsunParser())
 register(SinoPacParser())
 register(AmexParser())
+register(HsbcParser())
 register(ExampleBankParser())

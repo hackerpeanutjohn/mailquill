@@ -209,6 +209,7 @@ mailquill rebuild --db /tmp/scratch.db
 | 永豐銀行 SinoPac | `sinopac` | Gmail 附件 PDF | ✅ |
 | 富邦銀行 Fubon | `fubon` | ⚠️ 需手動下載 PDF | ✅ parser 就緒 |
 | 美國運通 American Express | `amex` | Gmail 附件 PDF | ✅ |
+| 匯豐銀行 HSBC Taiwan | `hsbc` | Gmail 附件 PDF／本地匯入 | ✅（部分 PDF 商家文字無法擷取） |
 
 ### ⚠️ 富邦：目前需手動下載後本地解析
 
