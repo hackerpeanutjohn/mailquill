@@ -13,18 +13,6 @@ _STATEMENT = """\
 115/05/25 115/05/26 某餐廳TAIPEI 2,766 TW
 """
 
-_WRAPPED_STATEMENT = """\
-115年 09月 信用卡電子帳單
-帳單結帳日 115/09/02
-本期新增款項 1,234
-消費日 入帳起息日 消費明細 新臺幣金額 外幣折算日 消費地 幣別 外幣金額
-測試聯名卡 (卡號末四碼:9999)
-某商店（On-us）
-115/08/30 115/08/31 1,234 TW
-TAIWAN
-"""
-
-
 def _msg(sender="台新銀行 <ebill@bhurecv.taishinbank.com.tw>"):
     return EmailMessage("m1", sender, "信用卡電子帳單", "", "", [])
 
@@ -54,7 +42,17 @@ def test_taishin_sum_ties_total():
 
 
 def test_taishin_parses_merchant_wrapped_before_date_row():
-    txns = TaishinParser().parse(_msg(), [_WRAPPED_STATEMENT])
+    statement = """\
+115年 09月 信用卡電子帳單
+帳單結帳日 115/09/02
+本期新增款項 1,234
+消費日 入帳起息日 消費明細 新臺幣金額 外幣折算日 消費地 幣別 外幣金額
+測試聯名卡 (卡號末四碼:9999)
+某商店（On-us）
+115/08/30 115/08/31 1,234 TW
+TAIWAN
+"""
+    txns = TaishinParser().parse(_msg(), [statement])
     assert len(txns) == 1
     assert txns[0].date == "2026-08-30"
     assert txns[0].post_date == "2026-08-31"
