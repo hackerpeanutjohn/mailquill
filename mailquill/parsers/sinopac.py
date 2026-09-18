@@ -30,8 +30,8 @@ _FX_TAIL = re.compile(r"\s*\d{2}/\d{2}\s+[A-Z]{3}[\d,.]+\s*$")   # 行尾「05/1
 _NUM = re.compile(r"-?[\d,]+")
 _A_PREFIX = re.compile(r"^A-\s*")
 
-# 期別／年份錨點（優先序：民國期別 → 民國全日期 → 西元年月）
-_ROC_PERIOD = re.compile(r"(?<!\d)(\d{2,3})\s*年\s*(\d{1,2})\s*月")
+# 期別／年份錨點（優先序：明確四位西元年月 → 三位民國期別 → 民國全日期）
+_ROC_PERIOD = re.compile(r"(?<!\d)(\d{3})\s*年\s*(\d{1,2})\s*月")
 _ROC_FULL = re.compile(r"(\d{3})/(\d{2})/(\d{2})")
 _AD_PERIOD = re.compile(r"(20\d{2})\s*[/年-]\s*(\d{1,2})")
 
@@ -47,15 +47,15 @@ class SinoPacParser(Parser):
         return "sinopac.com" in msg.sender     # 涵蓋 banksinopac.com.tw
 
     def _period(self, text: str) -> tuple[int, int] | None:
+        m = _AD_PERIOD.search(text)
+        if m:
+            return int(m.group(1)), int(m.group(2))
         m = _ROC_PERIOD.search(text)
         if m:
             return roc_to_ad(int(m.group(1))), int(m.group(2))
         m = _ROC_FULL.search(text)
         if m:
             return roc_to_ad(int(m.group(1))), int(m.group(2))
-        m = _AD_PERIOD.search(text)
-        if m:
-            return int(m.group(1)), int(m.group(2))
         return None
 
     def parse(self, msg: EmailMessage, pdf_texts: list[str]) -> list[RawTxn]:
