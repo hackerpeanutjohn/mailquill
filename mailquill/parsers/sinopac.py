@@ -31,7 +31,7 @@ _NUM = re.compile(r"-?[\d,]+")
 _A_PREFIX = re.compile(r"^A-\s*")
 
 # 期別／年份錨點（優先序：民國期別 → 民國全日期 → 西元年月）
-_ROC_PERIOD = re.compile(r"(\d{2,3})\s*年\s*(\d{1,2})\s*月")
+_ROC_PERIOD = re.compile(r"(?<!\d)(\d{2,3})\s*年\s*(\d{1,2})\s*月")
 _ROC_FULL = re.compile(r"(\d{3})/(\d{2})/(\d{2})")
 _AD_PERIOD = re.compile(r"(20\d{2})\s*[/年-]\s*(\d{1,2})")
 
