@@ -48,6 +48,13 @@ def test_sinopac_domestic_amount_and_year():
     assert t.post_date == "2026-05-22"
 
 
+def test_sinopac_gregorian_period_is_not_truncated_to_roc_year():
+    message = _msg(subject="永豐信用卡電子帳單 2026年06月")
+    txns = SinoPacParser().parse(message, [_STATEMENT])
+    assert txns[0].date == "2026-05-06"
+    assert txns[0].post_date == "2026-05-22"
+
+
 def test_sinopac_foreign_strips_fx_tail():
     by = {t.merchant_raw: t for t in SinoPacParser().parse(_msg(), [_STATEMENT])}
     t = by["SOME NOODLE BANGKOK TH"]        # 已剝除尾端「05/16 THB170.00」
