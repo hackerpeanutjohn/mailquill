@@ -50,7 +50,7 @@ def test_sinopac_domestic_amount_and_year():
 
 def test_sinopac_gregorian_period_is_not_truncated_to_roc_year():
     message = _msg(subject="永豐信用卡電子帳單 2026年06月")
-    txns = SinoPacParser().parse(message, [_STATEMENT])
+    txns = SinoPacParser().parse(message, [_STATEMENT + "\n優惠權益最長 26年06月\n"])
     assert txns[0].date == "2026-05-06"
     assert txns[0].post_date == "2026-05-22"
 
